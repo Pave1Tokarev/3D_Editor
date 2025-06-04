@@ -25,14 +25,9 @@ glm::vec3 CoordinateTransformer::transformPoint(const glm::vec3& point) const {
         }
     }
 
-    // Ќормализаци€ только если w != 0 и w != 1
     if (result[3] != 0.0 && result[3] != 1.0) {
         const double w = result[3];
-        // ¬озвращаем точку с w=1 после нормализации
         return glm::vec3(result[0] / w, result[1] / w, result[2] / w);
     }
-
-    // ≈сли w == 1, возвращаем как есть
-    // ≈сли w == 0, это направление (вектор), возвращаем без изменени€
     return glm::vec3(result[0], result[1], result[2]);
 }

@@ -204,9 +204,9 @@ int main() {
     specularTexture.type = "texture_specular";
     textures.push_back(specularTexture);
 
-    lines.push_back(Line3D("X Axis", glm::vec3(0.0f), glm::vec3(5.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f)));
-    lines.push_back(Line3D("Y Axis",glm::vec3(0.0f), glm::vec3(0.0f, 5.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
-    lines.push_back(Line3D("Z Axis",glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
+    Line3D X_axis("X Axis", glm::vec3(0.0f), glm::vec3(5.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    Line3D Y_axis("Y Axis",glm::vec3(0.0f), glm::vec3(0.0f, 5.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    Line3D Z_axis("Z Axis",glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
 
     IMGUI_CHECKVERSION();
@@ -335,6 +335,7 @@ int main() {
                    for (int idx : selectedIndices) {
                        if (idx >= 0 && idx < lines.size()) {
                            lines[idx].ApplyMatrix(transformer);
+
                        }
                    }
                }
@@ -431,15 +432,12 @@ int main() {
         glUniformMatrix4fv(glGetUniformLocation(lineShaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(glGetUniformLocation(lineShaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(glGetUniformLocation(lineShaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        glUniform3f(glGetUniformLocation(lineShaderProgram, "light.position"), 1.2f, 1.0f, 2.0f);
-        glUniform3f(glGetUniformLocation(lineShaderProgram, "light.ambient"), 0.2f, 0.2f, 0.2f);
-        glUniform3f(glGetUniformLocation(lineShaderProgram, "light.diffuse"), 0.5f, 0.5f, 0.5f);
-        glUniform3f(glGetUniformLocation(lineShaderProgram, "light.specular"), 1.0f, 1.0f, 1.0f);
-        glUniform1f(glGetUniformLocation(lineShaderProgram, "material.shininess"), 32.0f);
-        glUniform3f(glGetUniformLocation(lineShaderProgram, "viewPos"), camera.Position.x, camera.Position.y, camera.Position.z);
         for (int i = 0;i < lines.size();i++) {
             lines[i].Draw(lineShaderProgram);
         }
+        X_axis.Draw(lineShaderProgram);
+        Y_axis.Draw(lineShaderProgram);
+        Z_axis.Draw(lineShaderProgram);
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);

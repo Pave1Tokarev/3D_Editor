@@ -77,12 +77,6 @@
     <ClInclude Include="Shaders\ShaderPrograms.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="nuklear.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="nuklear_glfw_gl3.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="imgui.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -98,9 +92,5 @@
     <ClInclude Include="Services\CoordinateTransformer.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Shaders\camera.vs" />
-    <None Include="Shaders\camera.fs" />
   </ItemGroup>
 </Project>
