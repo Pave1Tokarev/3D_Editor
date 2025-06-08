@@ -21,7 +21,8 @@
 #include <fstream>
 #include <filesystem>
 #include "Services/CoordinateTransformer.h"
-
+std::vector<Line3D> lines = std::vector<Line3D>();
+std::vector<int> selectedIndices = std::vector<int>();
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f);
 float lastX = 400, lastY = 300;
 bool firstMouse = true;
@@ -29,10 +30,10 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 bool isMouseHidden = true;
 int lineCount = 0;
-static bool showAddLinePopup = false;
-static bool showMatrixInputPopup = false;
+bool showAddLinePopup = false;
+bool showMatrixInputPopup = false;
 std::string currentDir;
-static std::string selectedFile;
+std::string selectedFile;
 
 void saveLinesToFile(std::vector<Line3D>& lines, const std::string& filename) {
     std::ofstream out(filename, std::ios::binary);
@@ -88,6 +89,210 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     }
 }
 
+void showLineList() {
+    if (ImGui::BeginListBox("LinesList", ImVec2(-FLT_MIN, lines.size() * ImGui::GetTextLineHeightWithSpacing()))) {
+        for (int i = 0; i < lines.size(); i++) {
+            bool is_selected = (std::find(selectedIndices.begin(), selectedIndices.end(), i) != selectedIndices.end());
+
+            if (ImGui::Selectable((lines[i].getName()).c_str(), is_selected)) {
+                if (ImGui::GetIO().KeyCtrl) {
+                    auto it = std::find(selectedIndices.begin(), selectedIndices.end(), i);
+                    if (it != selectedIndices.end()) {
+                        selectedIndices.erase(it);
+                    }
+                    else {
+                        lines[i].Select(true);
+                        selectedIndices.push_back(i);
+                    }
+
+                }
+                else {
+                    for (int j = 0;j < selectedIndices.size();j++) {
+                        lines[selectedIndices[j]].Select(false);
+                    }
+                    selectedIndices.clear();
+                    lines[i].Select(true);
+                    selectedIndices.push_back(i);
+                }
+            }
+        }
+        ImGui::EndListBox();
+    }
+}
+void showDeleteLineButton() {
+    if (ImGui::Button("Delete Selected") && !selectedIndices.empty()) {
+        std::sort(selectedIndices.begin(), selectedIndices.end());
+        for (auto it = selectedIndices.rbegin(); it != selectedIndices.rend(); ++it) {
+            lines.erase(lines.begin() + *it);
+        }
+        lineCount--;
+        selectedIndices.clear();
+    }
+}
+void showAddLineButton() {
+    if (ImGui::Button("Add Line")) {
+        showAddLinePopup = true;
+        ImGui::OpenPopup("Add New Line");
+    }
+    if (ImGui::BeginPopupModal("Add New Line", &showAddLinePopup, ImGuiWindowFlags_AlwaysAutoResize)) {
+        static float startX, startY, startZ, endX, endY, endZ;
+        ImGui::Text("Start Point:");
+        ImGui::InputFloat("Start X", &startX);
+        ImGui::InputFloat("Start Y", &startY);
+        ImGui::InputFloat("Start Z", &startZ);
+
+        ImGui::Text("End Point:");
+        ImGui::InputFloat("End X", &endX);
+        ImGui::InputFloat("End Y", &endY);
+        ImGui::InputFloat("End Z", &endZ);
+
+
+        if (ImGui::Button("Create")) {
+
+            Line3D newLine = Line3D("Line " + std::to_string(lineCount), glm::vec3(startX, startY, startZ), glm::vec3(endX, endY, endZ), glm::vec3(1, 1, 1));
+            lines.push_back(newLine);
+            lineCount++;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+void showApplyMatrixButton() {
+    if (ImGui::Button("Apply Matrix")) {
+        showMatrixInputPopup = true;
+        ImGui::OpenPopup("Matrix Input");
+    }
+    if (ImGui::BeginPopupModal("Matrix Input", &showMatrixInputPopup, ImGuiWindowFlags_AlwaysAutoResize)) {
+        static std::vector<std::vector<double>> matrix = {
+            {1, 0, 0, 0},
+            {0, 1, 0, 0},
+            {0, 0, 1, 0},
+            {0, 0, 0, 1}
+        };
+        ImGui::Text("Enter 4x4 transformation matrix:");
+        ImGui::Separator();
+
+        for (int row = 0; row < 4; ++row) {
+            ImGui::PushID(row);
+            for (int col = 0; col < 4; ++col) {
+                ImGui::PushItemWidth(60.0f);
+                ImGui::InputDouble(("##" + std::to_string(col)).c_str(), &matrix[row][col], 0.0, 0.0, "%.3f");
+                ImGui::PopItemWidth();
+                if (col < 3) ImGui::SameLine();
+            }
+            ImGui::PopID();
+        }
+
+        if (ImGui::Button("Apply")) {
+            CoordinateTransformer transformer;
+            transformer.setTransformMatrix(matrix);
+            for (int idx : selectedIndices) {
+                if (idx >= 0 && idx < lines.size()) {
+                    lines[idx].ApplyMatrix(transformer);
+
+                }
+            }
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+void showSaveLoadButton() {
+    if (ImGui::Button("Save / Load")) {
+        if (currentDir.empty() || !std::filesystem::exists(currentDir)) {
+            currentDir = std::filesystem::current_path().string();
+        }
+    }
+
+    if (!currentDir.empty()) {
+        ImGui::BeginChild("DirectoryTree", ImVec2(0, 200), true);
+        if (std::filesystem::path(currentDir).has_parent_path()) {
+            if (ImGui::Selectable("../", false)) {
+                currentDir = std::filesystem::path(currentDir).parent_path().string();
+                selectedFile.clear();
+            }
+        }
+
+        for (const auto& entry : std::filesystem::directory_iterator(currentDir)) {
+            std::string name = entry.path().filename().string();
+            bool isSelected = (selectedFile == entry.path().string());
+
+            if (entry.is_directory()) {
+                name += "/";
+                if (ImGui::Selectable(name.c_str(), false)) {
+                    currentDir = entry.path().string();
+                    selectedFile.clear();
+                }
+            }
+            else {
+                if (ImGui::Selectable(name.c_str(), isSelected)) {
+                    selectedFile = entry.path().string();
+                }
+            }
+        }
+        ImGui::EndChild();
+
+        if (!selectedFile.empty()) {
+            ImGui::Text("Selected: %s", std::filesystem::path(selectedFile).filename().string().c_str());
+
+            if (ImGui::Button("Load")) {
+                lines.clear();
+                selectedIndices.clear();
+                lines = loadLinesFromFile(selectedFile);
+                ImGui::Text("Loaded successfully!");
+                currentDir = "";
+
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Save")) {
+                saveLinesToFile(lines, selectedFile);
+                ImGui::Text("Saved successfully!");
+                currentDir = "";
+            }
+        }
+        else {
+            static std::string newFileName;
+            ImGui::InputText("New file name", &newFileName);
+
+            if (ImGui::Button("Create New")) {
+                if (!newFileName.empty()) {
+                    selectedFile = currentDir + "/" + newFileName;
+                    std::ofstream out(selectedFile);
+                    out.close();
+                    newFileName.clear();
+
+                }
+            }
+        }
+
+    }
+}
+void showInterface() {
+    ImGui::Begin("Menu");
+    {
+        showLineList();
+        showDeleteLineButton();
+        showAddLineButton();
+        showApplyMatrixButton();
+        showSaveLoadButton();
+
+    }
+    ImGui::End();
+}
 
 void processInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -160,7 +365,6 @@ unsigned int createShaderProgram(const char* vertexShaderSource, const char* fra
 }
 
 int main() {
-    std::vector<Line3D> lines = std::vector<Line3D>();
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return -1;
@@ -229,203 +433,15 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-       static std::vector<int> selectedIndices;
 
-       ImGui::Begin("Line Manager");
-       {
-           if (ImGui::BeginListBox("LinesList", ImVec2(-FLT_MIN, lines.size() * ImGui::GetTextLineHeightWithSpacing()))) {
-               for (int i = 0; i < lines.size(); i++) {
-                   bool is_selected = (std::find(selectedIndices.begin(), selectedIndices.end(), i) != selectedIndices.end());
-
-                   if (ImGui::Selectable((lines[i].getName()).c_str(), is_selected)) {
-                       if (ImGui::GetIO().KeyCtrl) {
-                           auto it = std::find(selectedIndices.begin(), selectedIndices.end(), i);
-                           if (it != selectedIndices.end()) {
-                               selectedIndices.erase(it);
-                           }
-                           else {
-                               lines[i].Select(true);
-                               selectedIndices.push_back(i);
-                           }
-
-                       }
-                       else {
-                           for (int j = 0;j < selectedIndices.size();j++) {
-                               lines[selectedIndices[j]].Select(false);
-                           }
-                           selectedIndices.clear();
-                           lines[i].Select(true);
-                           selectedIndices.push_back(i);
-                       }
-                   }
-               }
-               ImGui::EndListBox();
-           }
-
-           if (ImGui::Button("Delete Selected") && !selectedIndices.empty()) {
-               std::sort(selectedIndices.begin(), selectedIndices.end());
-               for (auto it = selectedIndices.rbegin(); it != selectedIndices.rend(); ++it) {
-                   lines.erase(lines.begin() + *it);
-               }
-               lineCount--;
-               selectedIndices.clear();
-           }
-           if (ImGui::Button("Add Line")) {
-               showAddLinePopup = true;
-               ImGui::OpenPopup("Add New Line");
-           }
-           if (ImGui::BeginPopupModal("Add New Line", &showAddLinePopup, ImGuiWindowFlags_AlwaysAutoResize)) {
-               float startX, startY, startZ, endX, endY, endZ;
-               ImGui::Text("Start Point:");
-               ImGui::InputFloat("Start X", &startX);
-               ImGui::InputFloat("Start Y", &startY);
-               ImGui::InputFloat("Start Z", &startZ);
-
-               ImGui::Text("End Point:");
-               ImGui::InputFloat("End X", &endX);
-               ImGui::InputFloat("End Y", &endY);
-               ImGui::InputFloat("End Z", &endZ);
-
-
-               if (ImGui::Button("Create")) {
-
-                   Line3D newLine = Line3D("Line " + std::to_string(lineCount), glm::vec3(startX, startY, startZ),
-                       glm::vec3(endX, endY, endZ), glm::vec3(1, 1, 1));
-                   lines.push_back(newLine);
-                   lineCount++;
-                   ImGui::CloseCurrentPopup();
-               }
-
-               ImGui::SameLine();
-               if (ImGui::Button("Cancel")) {
-
-                   ImGui::CloseCurrentPopup();
-               }
-
-               ImGui::EndPopup();
-           }
-           if (ImGui::Button("Apply Matrix")) {
-               showMatrixInputPopup = true;
-               ImGui::OpenPopup("Matrix Input");
-           }
-           if (ImGui::BeginPopupModal("Matrix Input", &showMatrixInputPopup, ImGuiWindowFlags_AlwaysAutoResize)) {
-               static std::vector<std::vector<double>> matrix = {
-                   {1, 0, 0, 0},
-                   {0, 1, 0, 0},
-                   {0, 0, 1, 0},
-                   {0, 0, 0, 1}
-               };
-               ImGui::Text("Enter 4x4 transformation matrix:");
-               ImGui::Separator();
-
-               for (int row = 0; row < 4; ++row) {
-                   ImGui::PushID(row);
-                   for (int col = 0; col < 4; ++col) {
-                       ImGui::PushItemWidth(60.0f);
-                       ImGui::InputDouble(("##" + std::to_string(col)).c_str(), &matrix[row][col], 0.0, 0.0, "%.3f");
-                       ImGui::PopItemWidth();
-                       if (col < 3) ImGui::SameLine();
-                   }
-                   ImGui::PopID();
-               }
-
-               if (ImGui::Button("Apply")) {
-                   CoordinateTransformer transformer;
-                   transformer.setTransformMatrix(matrix);
-                   for (int idx : selectedIndices) {
-                       if (idx >= 0 && idx < lines.size()) {
-                           lines[idx].ApplyMatrix(transformer);
-
-                       }
-                   }
-               }
-
-               ImGui::SameLine();
-               if (ImGui::Button("Cancel")) {
-                   ImGui::CloseCurrentPopup();
-               }
-
-               ImGui::EndPopup();
-           }
-           if (ImGui::Button("Save / Load")) {
-               if (currentDir.empty() || !std::filesystem::exists(currentDir)) {
-                   currentDir = std::filesystem::current_path().string();
-               }
-           }
-
-           if (!currentDir.empty()) {
-                ImGui::BeginChild("DirectoryTree", ImVec2(0, 200), true);
-                if (std::filesystem::path(currentDir).has_parent_path()) {
-                    if (ImGui::Selectable("../", false)) {
-                        currentDir = std::filesystem::path(currentDir).parent_path().string();
-                        selectedFile.clear(); 
-                    }
-                }
-
-                for (const auto& entry : std::filesystem::directory_iterator(currentDir)) {
-                    std::string name = entry.path().filename().string();
-                    bool isSelected = (selectedFile == entry.path().string());
-
-                    if (entry.is_directory()) {
-                        name += "/";
-                        if (ImGui::Selectable(name.c_str(), false)) {
-                            currentDir = entry.path().string();
-                            selectedFile.clear();
-                        }
-                    }
-                    else {
-                        if (ImGui::Selectable(name.c_str(), isSelected)) {
-                            selectedFile = entry.path().string();
-                        }
-                    }
-                }
-               ImGui::EndChild();
-
-               if (!selectedFile.empty()) {
-                   ImGui::Text("Selected: %s", std::filesystem::path(selectedFile).filename().string().c_str());
-
-                   if (ImGui::Button("Load")) {
-                       lines.clear();
-                       selectedIndices.clear();
-                        lines = loadLinesFromFile(selectedFile);
-                        ImGui::Text("Loaded successfully!");
-                        currentDir = "";
-
-                   }
-
-                   ImGui::SameLine();
-
-                   if (ImGui::Button("Save")) {
-                        saveLinesToFile(lines, selectedFile);
-                        ImGui::Text("Saved successfully!");
-                        currentDir = "";
-                   }
-               }
-               else {
-                   static std::string newFileName;
-                   ImGui::InputText("New file name", &newFileName);
-
-                   if (ImGui::Button("Create New")) {
-                       if (!newFileName.empty()) {
-                           selectedFile = currentDir + "/" + newFileName;
-                            std::ofstream out(selectedFile);
-                            out.close();
-                            newFileName.clear();
-
-                       }
-                   }
-               }
-
-           }
-           
-       }
-       ImGui::End();
+       showInterface();
+       
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(lineShaderProgram);
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 1920.0f / 1080.0f, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 model = glm::mat4(1.0f);
 

@@ -21,7 +21,7 @@ glm::vec3 CoordinateTransformer::transformPoint(const glm::vec3& point) const {
 
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
-            result[i] += matrix[i][j] * input[j];
+            result[i] += (matrix[i][j] * input[j]);
         }
     }
 

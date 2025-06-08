@@ -115,7 +115,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Assimp\assimp.lib;GLFW\glfw3.lib;opengl32.lib;Glutlib\glew32.lib;Glutlib\glew32s.lib;freetype\freetype.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Assimp\assimp.lib;GLFW\glfw3dll.lib;opengl32.lib;Glutlib\glew32.lib;Glutlib\glew32s.lib;freetype\freetype.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -136,8 +136,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Services\CoordinateTransformer.cpp" />
-    <ClCompile Include="imgui-master\backends\imgui_impl_glfw.cpp" />
-    <ClCompile Include="imgui-master\backends\imgui_impl_opengl3.cpp" />
     <ClCompile Include="Services\Line3D.cpp" />
     <ClCompile Include="Rendering\camera.cpp" />
     <ClCompile Include="glad.c" />
@@ -150,9 +148,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Services\CoordinateTransformer.h" />
-    <ClInclude Include="imgui-master\backends\imgui_impl_glfw.h" />
-    <ClInclude Include="imgui-master\backends\imgui_impl_opengl3.h" />
-    <ClInclude Include="imgui-master\imgui.h" />
     <ClInclude Include="imgui.h" />
     <ClInclude Include="Services\Line3D.h" />
     <ClInclude Include="Rendering\camera.h" />
